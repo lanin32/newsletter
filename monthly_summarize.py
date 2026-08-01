@@ -44,25 +44,47 @@ If a "PREVIOUS MONTH'S DIGEST FOR THIS PROJECT" block is included, use it only
 for continuity -- don't repeat old news as if it's new this month. A genuine
 follow-up can be mentioned briefly (e.g. "following up on last month's testnet
 launch...").
+
+Citations:
+- Each X post in the raw material is tagged with a citation number, like
+  "(citation #7)". When a sentence draws on that post, add [7] right after
+  the sentence (inside the punctuation is fine, e.g. "...happened this month [7].").
+- If several consecutive sentences all draw from the SAME citation number,
+  only add it once, after the last of those sentences -- not after every
+  single sentence.
+- Citation numbers only apply to THIS MONTH'S raw material. If a "PREVIOUS
+  MONTH'S DIGEST" block is present for continuity, anything drawn from it
+  should NOT get a citation number (it doesn't have one).
 """
 
 
-def _format_posts(posts: list[dict]) -> str:
+def _format_posts(posts: list[dict]) -> tuple[str, dict[int, str]]:
+    """
+    Returns (formatted_text, citation_map). citation_map maps citation
+    number -> tweet URL.
+    """
     if not posts:
-        return ""
-    return "\n\n".join(
-        f"[{p.get('date', '')}] @{p['username']}: {p['text']}"
-        for p in posts
-    )
+        return "", {}
+
+    citation_map: dict[int, str] = {}
+    lines = []
+    for i, p in enumerate(posts, start=1):
+        citation_map[i] = f"https://x.com/{p['username']}/status/{p['id']}"
+        lines.append(f"[{p.get('date', '')}] (citation #{i}) @{p['username']}: {p['text']}")
+
+    return "\n\n".join(lines), citation_map
 
 
 def summarize_token_digest(
     token_symbol: str, posts: list[dict], previous_digest: str | None = None
-) -> str:
-    formatted = _format_posts(posts)
+) -> tuple[str, dict[int, str]]:
+    """
+    Returns (digest_paragraph, citation_map).
+    """
+    formatted, citation_map = _format_posts(posts)
 
     if not formatted.strip():
-        return "No notable activity found this month."
+        return "No notable activity found this month.", {}
 
     user_content = f"Project: {token_symbol}\n\n{formatted}"
     if previous_digest:
@@ -80,7 +102,7 @@ def summarize_token_digest(
         ],
     )
 
-    return response.choices[0].message.content.strip()
+    return response.choices[0].message.content.strip(), citation_map
 
 
 if __name__ == "__main__":
@@ -93,5 +115,8 @@ if __name__ == "__main__":
     posts = fetch_x_posts(username, lookback_days=30)
     print(f"Found {len(posts)} posts from @{username}\n")
 
-    digest = summarize_token_digest(symbol, posts)
+    digest, citation_map = summarize_token_digest(symbol, posts)
     print(f"=== {symbol} ===\n{digest}")
+    print(f"\n=== CITATIONS ({len(citation_map)}) ===")
+    for num, url in citation_map.items():
+        print(f"[{num}] {url}")

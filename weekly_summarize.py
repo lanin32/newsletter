@@ -93,11 +93,33 @@ Style:
   developments another, macro factors another. A section with only one or two
   stories can stay as a single paragraph; only split when there's enough
   distinct material to actually group.
+
+Citations:
+- Each X post in the raw material is tagged with a citation number, like
+  "(citation #7)". When a sentence draws on that post, add [7] right after
+  the sentence (inside the punctuation is fine, e.g. "...happened this week [7].").
+- If several consecutive sentences all draw from the SAME citation number,
+  only add it once, after the last of those sentences -- not after every
+  single sentence.
+- Only cite X posts. Newsletter content has no citation numbers -- don't
+  invent one or attach a citation to something that came from a newsletter.
+- Citation numbers only apply to THIS WEEK'S raw material. If a "LAST WEEK'S
+  DIGEST" block is present for continuity, anything drawn from it should NOT
+  get a citation number (it doesn't have one).
 """
 
 
-def _format_sources(sources: dict[str, list[dict]]) -> str:
+def _format_sources(sources: dict[str, list[dict]]) -> tuple[str, dict[int, str]]:
+    """
+    Returns (formatted_text, citation_map). citation_map maps citation number
+    -> tweet URL, for X posts only (newsletters aren't cited yet). Each X post
+    gets a stable number as it's formatted, so the model can cite it inline
+    and we can turn that number into a real link afterward.
+    """
     blocks = []
+    citation_map: dict[int, str] = {}
+    next_citation_num = 1
+
     for source_name, items in sources.items():
         if not items:
             continue
@@ -108,28 +130,34 @@ def _format_sources(sources: dict[str, list[dict]]) -> str:
                     f"[{item.get('date', '')}] Subject: {item['subject']}\n{item['body']}"
                 )
             elif "username" in item:  # X post
-                item_texts.append(f"[{item.get('date', '')}] {item['text']}")
+                num = next_citation_num
+                next_citation_num += 1
+                citation_map[num] = f"https://x.com/{item['username']}/status/{item['id']}"
+                item_texts.append(f"[{item.get('date', '')}] (citation #{num}) {item['text']}")
             else:
                 item_texts.append(str(item))
         blocks.append(f"=== {source_name} ===\n" + "\n\n".join(item_texts))
-    return "\n\n".join(blocks)
+
+    return "\n\n".join(blocks), citation_map
 
 
 def summarize_weekly_digest(
     sources: dict[str, list[dict]], previous_digest: str | None = None
-) -> dict[str, str]:
+) -> tuple[dict[str, str], dict[int, str]]:
     """
-    Returns {"btc": "...", "eth": "...", "general": "..."}.
+    Returns ({"btc": "...", "eth": "...", "general": "..."}, citation_map).
+    citation_map maps citation number -> tweet URL, for turning [N] markers
+    in the output into real links.
     previous_digest, if given, is last week's full digest text -- passed in
     so the model can maintain continuity (avoid re-reporting old news as new,
     reference something as a follow-up) rather than treating each week in
     isolation.
     """
-    formatted = _format_sources(sources)
+    formatted, citation_map = _format_sources(sources)
 
     if not formatted.strip():
         empty = "No notable news found for this week."
-        return {"btc": empty, "eth": empty, "general": empty}
+        return {"btc": empty, "eth": empty, "general": empty}, {}
 
     user_content = formatted
     if previous_digest:
@@ -167,7 +195,7 @@ def summarize_weekly_digest(
         elif current_key:
             sections[current_key] += line + "\n"
 
-    return {k: v.strip() for k, v in sections.items()}
+    return {k: v.strip() for k, v in sections.items()}, citation_map
 
 
 if __name__ == "__main__":
@@ -197,8 +225,12 @@ if __name__ == "__main__":
             print(f"  found {len(posts)} posts")
 
     print("\nSummarizing...")
-    digest = summarize_weekly_digest(sources)
+    digest, citation_map = summarize_weekly_digest(sources)
 
     for section in ["btc", "eth", "general"]:
         print(f"\n=== {section.upper()} ===")
         print(digest[section])
+
+    print(f"\n=== CITATIONS ({len(citation_map)}) ===")
+    for num, url in citation_map.items():
+        print(f"[{num}] {url}")

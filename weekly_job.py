@@ -13,6 +13,7 @@ from gmail_fetch import fetch_newsletter_emails, fetch_latest_email
 from x_fetch import fetch_x_posts
 from weekly_summarize import summarize_weekly_digest
 from gmail_send import send_email
+from citations import linkify_citations
 
 
 def build_sources(config: dict) -> dict:
@@ -65,11 +66,12 @@ def build_sources_footer_html(sources: dict) -> str:
     """
 
 
-def build_email_html(digest: dict[str, str], sources: dict) -> str:
+def build_email_html(digest: dict[str, str], sources: dict, citation_map: dict[int, str]) -> str:
     def paragraph(text: str) -> str:
+        linked = linkify_citations(text, citation_map)
         return "".join(
             f'<p style="margin: 0 0 12px 0; color: #333333; font-size: 14px; line-height: 1.6;">{chunk.strip()}</p>'
-            for chunk in text.split("\n\n") if chunk.strip()
+            for chunk in linked.split("\n\n") if chunk.strip()
         )
 
     def section(title: str, accent_color: str, content: str) -> str:
@@ -147,10 +149,10 @@ def main():
     sources = build_sources(config)
 
     print("\nSummarizing...")
-    digest = summarize_weekly_digest(sources, previous_digest=previous_digest)
+    digest, citation_map = summarize_weekly_digest(sources, previous_digest=previous_digest)
 
     print("\nBuilding email...")
-    html = build_email_html(digest, sources)
+    html = build_email_html(digest, sources, citation_map)
 
     subject = f"{email_cfg['subject']} — {date.today().strftime('%b %d, %Y')}"
 

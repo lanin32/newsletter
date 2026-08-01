@@ -15,6 +15,7 @@ from x_fetch import fetch_x_posts
 from monthly_summarize import summarize_token_digest
 from gmail_fetch import fetch_latest_email
 from gmail_send import send_email
+from citations import linkify_citations
 
 
 def parse_previous_digest(text: str, symbols: list[str]) -> dict[str, str]:
@@ -62,10 +63,10 @@ def build_token_digests(config: dict, previous_sections: dict[str, str] | None =
             print(f"  @{account}: {len(posts)} posts")
             time.sleep(1)  # polite pause between accounts
 
-        digest = summarize_token_digest(
+        digest, citation_map = summarize_token_digest(
             symbol, all_posts, previous_digest=previous_sections.get(symbol)
         )
-        digests[symbol] = digest
+        digests[symbol] = linkify_citations(digest, citation_map)
 
     return digests
 

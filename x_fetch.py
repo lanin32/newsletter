@@ -67,7 +67,7 @@ def _get_user_posts(user_id: str, lookback_days: int) -> list[dict]:
 
 def fetch_x_posts(username: str, lookback_days: int = 7) -> list[dict]:
     """
-    Returns a list of {username, text, date} dicts for one account's posts
+    Returns a list of {username, text, date, id} dicts for one account's posts
     within the lookback window, in chronological (oldest-first) order.
     """
     print(f"Fetching @{username}...")
@@ -83,6 +83,7 @@ def fetch_x_posts(username: str, lookback_days: int = 7) -> list[dict]:
             "username": username,
             "text": post["text"],
             "date": post.get("created_at", ""),
+            "id": post["id"],
         }
         for post in reversed(posts)
     ]
