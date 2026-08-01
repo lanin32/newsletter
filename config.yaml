@@ -15,9 +15,6 @@ x_accounts:
   ETH:
     - VitalikButerin
 
-output:
-  section_title: "General Market"
-
 email:
   to: "lyubo.anin@gmail.com"   # where the digest gets sent
   read_account: "theforumdevv@gmail.com"   # the account token.pickle reads from -- digest gets bcc'd here for continuity
@@ -27,6 +24,42 @@ monthly:
   subject: "Crypto Monthly Digest — Small/Mid Caps"
   tokens:
     - symbol: "AKT"
-      x_accounts: ["akashnet_"]   # double check this is the correct handle
+      x_accounts: ["akashnet"]
+    - symbol: "ATH"
+      x_accounts: ["AethirCloud"]      
     - symbol: "MINA"
       x_accounts: ["MinaProtocol"]
+    - symbol: "STRK"
+      x_accounts: ["Starknet"]
+    - symbol: "LINK"
+      x_accounts: ["Chainlink"]
+    - symbol: "OCTA"
+      x_accounts: ["octa_space"]
+    - symbol: "AVAX"
+      x_accounts: ["avax"]
+    - symbol: "POL"
+      x_accounts: ["0xPolygon"]
+    - symbol: "ORAI"
+      x_accounts: ["oraichain"]
+    - symbol: "SLC"
+      x_accounts: ["silencioNetwork"]
+    - symbol: "YOM"
+      x_accounts: ["YOM_Official"]
+    - symbol: "FRIC"
+      x_accounts: ["fricthefrog"]
+    - symbol: "FITTED"
+      x_accounts: ["fittedcloset"]
+    - symbol: "AGI"
+      x_accounts: ["The_Delysium"]
+    - symbol: "VAI"
+      x_accounts: ["VAIOT_LTD"]      
+    - symbol: "HINT"
+      x_accounts: ["Hive_Intel"]
+    - symbol: "PIN"
+      x_accounts: ["PinLinkAi"]
+    - symbol: "FLT"
+      x_accounts: ["fluence_project"]
+    - symbol: "SCR"
+      x_accounts: ["Scroll_ZKP"]
+    - symbol: "RUNNIT"
+      x_accounts: ["runnitdotgg", "0xArdent"]
