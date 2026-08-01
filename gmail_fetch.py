@@ -1,0 +1,95 @@
+"""
+Fetches emails matching a Gmail search query from the last N days and
+returns their plain-text bodies.
+"""
+import os
+import pickle
+import base64
+from datetime import datetime, timedelta, UTC
+from googleapiclient.discovery import build
+from bs4 import BeautifulSoup
+
+TOKEN_PATH = os.environ.get("TOKEN_PATH", "token.pickle")
+
+
+def _get_service():
+    with open(TOKEN_PATH, "rb") as f:
+        creds = pickle.load(f)
+    return build("gmail", "v1", credentials=creds)
+
+
+def _extract_body(payload) -> str:
+    """Walk the MIME tree and pull out readable text (prefer plain, fall back to HTML)."""
+    def find_part(parts, mime_type):
+        for part in parts:
+            if part.get("mimeType") == mime_type:
+                return part
+            if "parts" in part:
+                found = find_part(part["parts"], mime_type)
+                if found:
+                    return found
+        return None
+
+    parts = payload.get("parts", [payload])
+
+    plain = find_part(parts, "text/plain")
+    if plain and "data" in plain.get("body", {}):
+        data = plain["body"]["data"]
+        return base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore")
+
+    html_part = find_part(parts, "text/html")
+    if html_part and "data" in html_part.get("body", {}):
+        data = html_part["body"]["data"]
+        html = base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore")
+        return BeautifulSoup(html, "html.parser").get_text(separator="\n", strip=True)
+
+    return ""
+
+
+def fetch_newsletter_emails(gmail_query: str, lookback_days: int = 7) -> list[dict]:
+    """
+    Returns a list of {subject, date, body} dicts for emails matching the
+    query within the lookback window.
+    """
+    service = _get_service()
+
+    after_date = (datetime.now(UTC) - timedelta(days=lookback_days)).strftime("%Y/%m/%d")
+    full_query = f"{gmail_query} after:{after_date}"
+
+    results = service.users().messages().list(userId="me", q=full_query).execute()
+    messages = results.get("messages", [])
+
+    emails = []
+    for msg_meta in messages:
+        msg = service.users().messages().get(
+            userId="me", id=msg_meta["id"], format="full"
+        ).execute()
+
+        headers = {h["name"]: h["value"] for h in msg["payload"]["headers"]}
+        body = _extract_body(msg["payload"])
+
+        emails.append({
+            "subject": headers.get("Subject", "(no subject)"),
+            "date": headers.get("Date", ""),
+            "body": body,
+        })
+
+    return emails
+
+
+if __name__ == "__main__":
+    import yaml
+
+    with open("config.yaml") as f:
+        config = yaml.safe_load(f)
+
+    newsletter_cfg = config["newsletters"][0]
+    print(f"Query: {newsletter_cfg['gmail_query']}, lookback: {newsletter_cfg['lookback_days']} days")
+
+    emails = fetch_newsletter_emails(
+        newsletter_cfg["gmail_query"],
+        lookback_days=newsletter_cfg["lookback_days"],
+    )
+    print(f"Found {len(emails)} emails")
+    for e in emails:
+        print(f"- {e['subject']} ({e['date']}) — {len(e['body'])} chars")

@@ -1,0 +1,65 @@
+newsletters:
+  - name: "Milk Road"
+    gmail_query: "from:newsletter@mail.milkroad.com"
+    lookback_days: 7
+  - name: "Bankless"
+    gmail_query: "from:REPLACE_ME"   # fill in once you see the actual sender address
+    lookback_days: 7
+  - name: "Proof of Words"
+    gmail_query: "from:REPLACE_ME"   # fill in once you see the actual sender address
+    lookback_days: 7
+
+x_accounts:
+  BTC:
+    - DanHeld
+  ETH:
+    - VitalikButerin
+
+email:
+  to: "lyubo.anin@gmail.com"   # where the digest gets sent
+  subject: "Crypto Weekly Digest"
+
+monthly:
+  subject: "Crypto Monthly Digest - Small/Mid Caps"
+  tokens:
+    - symbol: "AKT"
+      x_accounts: ["akashnet"]
+    - symbol: "ATH"
+      x_accounts: ["AethirCloud"]      
+    - symbol: "MINA"
+      x_accounts: ["MinaProtocol"]
+    - symbol: "STRK"
+      x_accounts: ["Starknet"]
+    - symbol: "LINK"
+      x_accounts: ["Chainlink"]
+    - symbol: "OCTA"
+      x_accounts: ["octa_space"]
+    - symbol: "AVAX"
+      x_accounts: ["avax"]
+    - symbol: "POL"
+      x_accounts: ["0xPolygon"]
+    - symbol: "ORAI"
+      x_accounts: ["oraichain"]
+    - symbol: "SLC"
+      x_accounts: ["silencioNetwork"]
+    - symbol: "YOM"
+      x_accounts: ["YOM_Official"]
+    - symbol: "FRIC"
+      x_accounts: ["fricthefrog"]
+    - symbol: "FITTED"
+      x_accounts: ["fittedcloset"]
+    - symbol: "AGI"
+      x_accounts: ["The_Delysium"]
+    - symbol: "VAI"
+      x_accounts: ["VAIOT_LTD"]      
+    - symbol: "HINT"
+      x_accounts: ["Hive_Intel"]
+    - symbol: "PIN"
+      x_accounts: ["PinLinkAi"]
+    - symbol: "FLT"
+      x_accounts: ["fluence_project"]
+    - symbol: "SCR"
+      x_accounts: ["Scroll_ZKP"]
+    - symbol: "RUNNIT"
+      x_accounts: ["runnitdotgg", "0xArdent"]
+
