@@ -39,6 +39,11 @@ Write a single digest paragraph, 4-8 sentences depending on how much happened:
 - No fluff, no "in conclusion", no restating that this is a summary.
 - If genuinely nothing noteworthy happened this month, say so in one sentence
   rather than padding.
+
+If a "PREVIOUS MONTH'S DIGEST FOR THIS PROJECT" block is included, use it only
+for continuity -- don't repeat old news as if it's new this month. A genuine
+follow-up can be mentioned briefly (e.g. "following up on last month's testnet
+launch...").
 """
 
 
@@ -51,18 +56,27 @@ def _format_posts(posts: list[dict]) -> str:
     )
 
 
-def summarize_token_digest(token_symbol: str, posts: list[dict]) -> str:
+def summarize_token_digest(
+    token_symbol: str, posts: list[dict], previous_digest: str | None = None
+) -> str:
     formatted = _format_posts(posts)
 
     if not formatted.strip():
         return "No notable activity found this month."
+
+    user_content = f"Project: {token_symbol}\n\n{formatted}"
+    if previous_digest:
+        user_content = (
+            f"=== PREVIOUS MONTH'S DIGEST FOR THIS PROJECT ===\n{previous_digest}\n\n"
+            f"=== THIS MONTH'S RAW MATERIAL ===\n{formatted}"
+        )
 
     response = client.chat.completions.create(
         model="gpt-4.1",
         max_tokens=400,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"Project: {token_symbol}\n\n{formatted}"},
+            {"role": "user", "content": user_content},
         ],
     )
 
@@ -73,8 +87,8 @@ if __name__ == "__main__":
     from x_fetch import fetch_x_posts
 
     # quick manual test -- edit these to try a specific token/account
-    symbol = "RUNNIT"
-    username = "0xArdent"
+    symbol = "AKT"
+    username = "akashnet_"
 
     posts = fetch_x_posts(username, lookback_days=30)
     print(f"Found {len(posts)} posts from @{username}\n")

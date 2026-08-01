@@ -13,14 +13,43 @@ import yaml
 
 from x_fetch import fetch_x_posts
 from monthly_summarize import summarize_token_digest
+from gmail_fetch import fetch_latest_email
 from gmail_send import send_email
 
 
-def build_token_digests(config: dict) -> dict[str, str]:
+def parse_previous_digest(text: str, symbols: list[str]) -> dict[str, str]:
+    """
+    Splits last month's plain-text digest back into per-token sections.
+    Relies on the email's own structure: each token's symbol renders as its
+    own line (from the <h2>{symbol}</h2> in the HTML) right before that
+    token's paragraph, once the email is stripped down to plain text.
+    """
+    sections: dict[str, str] = {}
+    current_symbol = None
+    buffer: list[str] = []
+
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped in symbols:
+            if current_symbol:
+                sections[current_symbol] = "\n".join(buffer).strip()
+            current_symbol = stripped
+            buffer = []
+        elif current_symbol:
+            buffer.append(line)
+
+    if current_symbol:
+        sections[current_symbol] = "\n".join(buffer).strip()
+
+    return sections
+
+
+def build_token_digests(config: dict, previous_sections: dict[str, str] | None = None) -> dict[str, str]:
     """
     Returns {token_symbol: digest_paragraph} for every token in config.
     """
     digests = {}
+    previous_sections = previous_sections or {}
 
     for token_cfg in config.get("monthly", {}).get("tokens", []):
         symbol = token_cfg["symbol"]
@@ -33,7 +62,9 @@ def build_token_digests(config: dict) -> dict[str, str]:
             print(f"  @{account}: {len(posts)} posts")
             time.sleep(1)  # polite pause between accounts
 
-        digest = summarize_token_digest(symbol, all_posts)
+        digest = summarize_token_digest(
+            symbol, all_posts, previous_digest=previous_sections.get(symbol)
+        )
         digests[symbol] = digest
 
     return digests
@@ -92,17 +123,33 @@ def main():
     with open("config.yaml") as f:
         config = yaml.safe_load(f)
 
-    digests = build_token_digests(config)
+    monthly_cfg = config["monthly"]
+    email_cfg = config["email"]
+
+    print("Checking for last month's digest (for continuity)...")
+    previous = fetch_latest_email(f'subject:"{monthly_cfg["subject"]}"')
+    previous_sections = {}
+    if previous:
+        symbols = [t["symbol"] for t in monthly_cfg.get("tokens", [])]
+        previous_sections = parse_previous_digest(previous["body"], symbols)
+        print(f"  found one from {previous['date']}, parsed {len(previous_sections)} token section(s)")
+    else:
+        print("  none found (first run?)")
+
+    digests = build_token_digests(config, previous_sections=previous_sections)
 
     print("\nBuilding email...")
     html = build_email_html(digests)
 
-    monthly_cfg = config["monthly"]
-    email_cfg = config["email"]
     subject = f"{monthly_cfg['subject']} — {date.today().strftime('%b %Y')}"
 
     print(f"Sending to {email_cfg['to']}...")
-    send_email(to=email_cfg["to"], subject=subject, body_html=html)
+    send_email(
+        to=email_cfg["to"],
+        subject=subject,
+        body_html=html,
+        bcc=email_cfg.get("read_account"),
+    )
     print("Done.")
 
 
