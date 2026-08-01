@@ -46,6 +46,21 @@ def _extract_body(payload) -> str:
     return ""
 
 
+def _get_email(service, msg_id: str) -> dict:
+    msg = service.users().messages().get(
+        userId="me", id=msg_id, format="full"
+    ).execute()
+
+    headers = {h["name"]: h["value"] for h in msg["payload"]["headers"]}
+    body = _extract_body(msg["payload"])
+
+    return {
+        "subject": headers.get("Subject", "(no subject)"),
+        "date": headers.get("Date", ""),
+        "body": body,
+    }
+
+
 def fetch_newsletter_emails(gmail_query: str, lookback_days: int = 7) -> list[dict]:
     """
     Returns a list of {subject, date, body} dicts for emails matching the
@@ -59,22 +74,26 @@ def fetch_newsletter_emails(gmail_query: str, lookback_days: int = 7) -> list[di
     results = service.users().messages().list(userId="me", q=full_query).execute()
     messages = results.get("messages", [])
 
-    emails = []
-    for msg_meta in messages:
-        msg = service.users().messages().get(
-            userId="me", id=msg_meta["id"], format="full"
-        ).execute()
+    return [_get_email(service, m["id"]) for m in messages]
 
-        headers = {h["name"]: h["value"] for h in msg["payload"]["headers"]}
-        body = _extract_body(msg["payload"])
 
-        emails.append({
-            "subject": headers.get("Subject", "(no subject)"),
-            "date": headers.get("Date", ""),
-            "body": body,
-        })
+def fetch_latest_email(gmail_query: str) -> dict | None:
+    """
+    Returns the single most recent email matching the query, with no date
+    window -- used to pull up "the previous digest," whenever it was sent.
+    Returns None if nothing matches (e.g. first run, nothing sent yet).
+    """
+    service = _get_service()
 
-    return emails
+    results = service.users().messages().list(
+        userId="me", q=gmail_query, maxResults=1
+    ).execute()
+    messages = results.get("messages", [])
+
+    if not messages:
+        return None
+
+    return _get_email(service, messages[0]["id"])
 
 
 if __name__ == "__main__":

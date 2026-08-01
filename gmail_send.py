@@ -17,16 +17,20 @@ def _get_service():
     return build("gmail", "v1", credentials=creds)
 
 
-def send_email(to: str, subject: str, body_html: str) -> None:
+def send_email(to: str, subject: str, body_html: str, bcc: str | None = None) -> None:
     """
     Sends an HTML email to the given address, from whichever account
-    token.pickle is authorized for.
+    token.pickle is authorized for. If bcc is given, a hidden copy also
+    goes there -- used to archive the digest back into the reading inbox
+    so the next run can pull it up as "the previous digest."
     """
     service = _get_service()
 
     message = MIMEText(body_html, "html")
     message["to"] = to
     message["subject"] = subject
+    if bcc:
+        message["bcc"] = bcc
 
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
 

@@ -26,6 +26,12 @@ short, informal, and may be fragmentary, sarcastic, or reference things without 
 context -- read them accordingly, and don't over-interpret a casual post as a formal
 announcement.
 
+If a "LAST WEEK'S DIGEST" block is included before this week's raw material, use it
+only for continuity -- don't restate anything from it as if it's new this week. If
+something is a genuine follow-up or update to what was reported last week, you can
+say so briefly (e.g. "following up on last week's X..."), but the bulk of each
+section should be this week's actual new material.
+
 Before writing anything, first make a private list of every distinct story or
 fact found across all sources. Assign each one to exactly one section (BTC, ETH,
 or GENERAL) based on what it's actually about. Do this assignment BEFORE drafting
@@ -103,9 +109,15 @@ def _format_sources(sources: dict[str, list[dict]]) -> str:
     return "\n\n".join(blocks)
 
 
-def summarize_weekly_digest(sources: dict[str, list[dict]]) -> dict[str, str]:
+def summarize_weekly_digest(
+    sources: dict[str, list[dict]], previous_digest: str | None = None
+) -> dict[str, str]:
     """
     Returns {"btc": "...", "eth": "...", "general": "..."}.
+    previous_digest, if given, is last week's full digest text -- passed in
+    so the model can maintain continuity (avoid re-reporting old news as new,
+    reference something as a follow-up) rather than treating each week in
+    isolation.
     """
     formatted = _format_sources(sources)
 
@@ -113,14 +125,26 @@ def summarize_weekly_digest(sources: dict[str, list[dict]]) -> dict[str, str]:
         empty = "No notable news found for this week."
         return {"btc": empty, "eth": empty, "general": empty}
 
+    user_content = formatted
+    if previous_digest:
+        user_content = (
+            f"=== LAST WEEK'S DIGEST (for continuity -- do not repeat this as if "
+            f"it's new; you may reference it as background for a follow-up) ===\n"
+            f"{previous_digest}\n\n"
+            f"=== THIS WEEK'S RAW MATERIAL ===\n{formatted}"
+        )
+
     response = client.chat.completions.create(
         model="gpt-4.1",
-        max_tokens=1200,
+        max_tokens=2500,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": formatted},
+            {"role": "user", "content": user_content},
         ],
     )
+
+    if response.choices[0].finish_reason == "length":
+        print("  WARNING: response was cut off by max_tokens -- consider raising it further")
 
     text = response.choices[0].message.content
 

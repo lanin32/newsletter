@@ -9,7 +9,7 @@ from datetime import date
 import time
 import yaml
 
-from gmail_fetch import fetch_newsletter_emails
+from gmail_fetch import fetch_newsletter_emails, fetch_latest_email
 from x_fetch import fetch_x_posts
 from summarize import summarize_weekly_digest
 from gmail_send import send_email
@@ -134,19 +134,33 @@ def main():
     with open("config.yaml") as f:
         config = yaml.safe_load(f)
 
+    email_cfg = config["email"]
+
+    print("Checking for last week's digest (for continuity)...")
+    previous = fetch_latest_email(f'subject:"{email_cfg["subject"]}"')
+    previous_digest = previous["body"] if previous else None
+    if previous:
+        print(f"  found one from {previous['date']}")
+    else:
+        print("  none found (first run?)")
+
     sources = build_sources(config)
 
     print("\nSummarizing...")
-    digest = summarize_weekly_digest(sources)
+    digest = summarize_weekly_digest(sources, previous_digest=previous_digest)
 
     print("\nBuilding email...")
     html = build_email_html(digest, sources)
 
-    email_cfg = config["email"]
     subject = f"{email_cfg['subject']} — {date.today().strftime('%b %d, %Y')}"
 
     print(f"Sending to {email_cfg['to']}...")
-    send_email(to=email_cfg["to"], subject=subject, body_html=html)
+    send_email(
+        to=email_cfg["to"],
+        subject=subject,
+        body_html=html,
+        bcc=email_cfg.get("read_account"),
+    )
     print("Done.")
 
 
