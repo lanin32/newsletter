@@ -87,6 +87,12 @@ Content priorities (apply to all three sections):
 Style:
 - Plain prose, no bullet points, no sub-headers within a section
 - No fluff, no "in conclusion", no restating that this is a summary
+- Within each section, group related stories into separate paragraphs, with a
+  blank line between paragraphs -- don't write one continuous block. For
+  example, institutional/corporate news might be one paragraph, regulatory
+  developments another, macro factors another. A section with only one or two
+  stories can stay as a single paragraph; only split when there's enough
+  distinct material to actually group.
 """
 
 

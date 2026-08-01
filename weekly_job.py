@@ -68,8 +68,8 @@ def build_sources_footer_html(sources: dict) -> str:
 def build_email_html(digest: dict[str, str], sources: dict) -> str:
     def paragraph(text: str) -> str:
         return "".join(
-            f'<p style="margin: 0 0 12px 0; color: #333333; font-size: 14px; line-height: 1.6;">{line}</p>'
-            for line in text.split("\n") if line.strip()
+            f'<p style="margin: 0 0 12px 0; color: #333333; font-size: 14px; line-height: 1.6;">{chunk.strip()}</p>'
+            for chunk in text.split("\n\n") if chunk.strip()
         )
 
     def section(title: str, accent_color: str, content: str) -> str:
