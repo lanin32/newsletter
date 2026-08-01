@@ -19,8 +19,8 @@ output:
   section_title: "General Market"
 
 email:
-  to: "REPLACE_WITH_RECIPIENT@example.com"   # where the digest gets sent
-  read_account: "REPLACE_WITH_YOUR_GMAIL@gmail.com"   # the account token.pickle reads from -- digest gets bcc'd here for continuity
+  to: "lyubo.anin@gmail.com"   # where the digest gets sent
+  read_account: "theforumdevv@gmail.com"   # the account token.pickle reads from -- digest gets bcc'd here for continuity
   subject: "Crypto Weekly Digest"
 
 monthly:
