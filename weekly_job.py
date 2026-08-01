@@ -11,7 +11,7 @@ import yaml
 
 from gmail_fetch import fetch_newsletter_emails, fetch_latest_email
 from x_fetch import fetch_x_posts
-from summarize import summarize_weekly_digest
+from weekly_summarize import summarize_weekly_digest
 from gmail_send import send_email
 
 
