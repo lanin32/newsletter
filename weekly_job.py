@@ -38,35 +38,50 @@ def build_sources(config: dict) -> dict:
     return sources
 
 
-def build_sources_footer_html(sources: dict) -> str:
+def build_sources_footer_html(items_meta: list[dict]) -> str:
     """
-    Lists what fed into this digest -- newsletter subject lines, and which
-    X accounts were checked (with how many posts each contributed).
+    Lists every source item, grouped by source, with its citation number and
+    link when it has one (matching the inline [N] citations exactly) -- or
+    just the title when it doesn't (e.g. a newsletter with no link found).
     """
-    lines = []
-    for source_name, items in sources.items():
-        if not items:
-            continue
-        if "(newsletter)" in source_name:
-            subjects = ", ".join(item["subject"] for item in items)
-            lines.append(f"<li>{source_name}: {subjects}</li>")
-        elif "(X posts)" in source_name:
-            lines.append(f"<li>{source_name}: {len(items)} post(s) this week</li>")
-        else:
-            lines.append(f"<li>{source_name}: {len(items)} item(s)</li>")
-
-    if not lines:
+    if not items_meta:
         return "<span style=\"color: #999999; font-size: 12px; font-family: sans-serif;\">No sources found this week.</span>"
+
+    grouped: dict[str, list[dict]] = {}
+    for m in items_meta:
+        grouped.setdefault(m["source_name"], []).append(m)
+
+    group_blocks = []
+    for source_name, items in grouped.items():
+        entries = []
+        for m in items:
+            if m["citation_num"] is not None:
+                entries.append(
+                    f'<li><a href="{m["url"]}" style="color: #888888; text-decoration: none;">'
+                    f'[{m["citation_num"]}]</a> {m["label"]}</li>'
+                )
+            else:
+                entries.append(f"<li>{m['label']}</li>")
+        group_blocks.append(
+            f'<div style="margin-bottom: 10px;">'
+            f'<strong style="color: #777777;">{source_name}</strong>'
+            f'<ul style="margin: 4px 0 0; padding-left: 18px;">{"".join(entries)}</ul>'
+            f"</div>"
+        )
 
     return f"""
     <span style="color: #999999; font-size: 12px; font-family: sans-serif;">SOURCES THIS WEEK</span>
-    <ul style="color: #999999; font-size: 12px; font-family: sans-serif; margin: 8px 0 0; padding-left: 18px;">
-      {''.join(lines)}
-    </ul>
+    <div style="color: #999999; font-size: 12px; font-family: sans-serif; margin-top: 8px;">
+      {''.join(group_blocks)}
+    </div>
     """
 
 
-def build_email_html(digest: dict[str, str], sources: dict, citation_map: dict[int, str]) -> str:
+def build_email_html(digest: dict[str, str], items_meta: list[dict]) -> str:
+    citation_map = {
+        m["citation_num"]: m["url"] for m in items_meta if m["citation_num"] is not None
+    }
+
     def paragraph(text: str) -> str:
         linked = linkify_citations(text, citation_map)
         return "".join(
@@ -120,7 +135,7 @@ def build_email_html(digest: dict[str, str], sources: dict, citation_map: dict[i
 
                 <tr>
                   <td style="padding: 16px 32px; background-color: #fafafa; border-top: 1px solid #eeeeee;">
-                    {build_sources_footer_html(sources)}
+                    {build_sources_footer_html(items_meta)}
                   </td>
                 </tr>
               </table>
@@ -149,10 +164,10 @@ def main():
     sources = build_sources(config)
 
     print("\nSummarizing...")
-    digest, citation_map = summarize_weekly_digest(sources, previous_digest=previous_digest)
+    digest, items_meta = summarize_weekly_digest(sources, previous_digest=previous_digest)
 
     print("\nBuilding email...")
-    html = build_email_html(digest, sources, citation_map)
+    html = build_email_html(digest, items_meta)
 
     subject = f"{email_cfg['subject']} — {date.today().strftime('%b %d, %Y')}"
 

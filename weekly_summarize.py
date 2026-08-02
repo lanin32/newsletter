@@ -111,16 +111,17 @@ Citations:
 """
 
 
-def _format_sources(sources: dict[str, list[dict]]) -> tuple[str, dict[int, str]]:
+def _format_sources(sources: dict[str, list[dict]]) -> tuple[str, list[dict]]:
     """
-    Returns (formatted_text, citation_map). citation_map maps citation number
-    -> URL. X posts always get a citation number; newsletter emails get one
-    only if a "view online" link could be extracted from the email (see
-    gmail_fetch.py) -- otherwise they're left uncited and just show up in the
-    "Sources this week" footer by title, for manual lookup.
+    Returns (formatted_text, items_meta). items_meta is an ordered list of
+    {source_name, label, url, citation_num} dicts, one per item across all
+    sources -- used both to build the citation link map and to render a
+    "Sources this week" footer with numbers/links that match the inline
+    citations exactly. citation_num and url are None for items with no
+    citation (e.g. a newsletter with no "view online" link found).
     """
     blocks = []
-    citation_map: dict[int, str] = {}
+    items_meta: list[dict] = []
     next_citation_num = 1
 
     for source_name, items in sources.items():
@@ -129,10 +130,11 @@ def _format_sources(sources: dict[str, list[dict]]) -> tuple[str, dict[int, str]
         item_texts = []
         for item in items:
             if "subject" in item:  # newsletter email
-                if item.get("url"):
+                url = item.get("url")
+                num = None
+                if url:
                     num = next_citation_num
                     next_citation_num += 1
-                    citation_map[num] = item["url"]
                     item_texts.append(
                         f"[{item.get('date', '')}] (citation #{num}) "
                         f"Subject: {item['subject']}\n{item['body']}"
@@ -141,35 +143,44 @@ def _format_sources(sources: dict[str, list[dict]]) -> tuple[str, dict[int, str]
                     item_texts.append(
                         f"[{item.get('date', '')}] Subject: {item['subject']}\n{item['body']}"
                     )
+                items_meta.append({
+                    "source_name": source_name, "label": item["subject"],
+                    "url": url, "citation_num": num,
+                })
             elif "username" in item:  # X post
                 num = next_citation_num
                 next_citation_num += 1
-                citation_map[num] = f"https://x.com/{item['username']}/status/{item['id']}"
+                url = f"https://x.com/{item['username']}/status/{item['id']}"
+                label = item["text"][:80] + ("..." if len(item["text"]) > 80 else "")
                 item_texts.append(f"[{item.get('date', '')}] (citation #{num}) {item['text']}")
+                items_meta.append({
+                    "source_name": source_name, "label": label,
+                    "url": url, "citation_num": num,
+                })
             else:
                 item_texts.append(str(item))
         blocks.append(f"=== {source_name} ===\n" + "\n\n".join(item_texts))
 
-    return "\n\n".join(blocks), citation_map
+    return "\n\n".join(blocks), items_meta
 
 
 def summarize_weekly_digest(
     sources: dict[str, list[dict]], previous_digest: str | None = None
-) -> tuple[dict[str, str], dict[int, str]]:
+) -> tuple[dict[str, str], list[dict]]:
     """
-    Returns ({"btc": "...", "eth": "...", "general": "..."}, citation_map).
-    citation_map maps citation number -> tweet URL, for turning [N] markers
-    in the output into real links.
+    Returns ({"btc": "...", "eth": "...", "general": "..."}, items_meta).
+    items_meta is the same structure _format_sources returns -- used to
+    build the citation link map and the sources footer.
     previous_digest, if given, is last week's full digest text -- passed in
     so the model can maintain continuity (avoid re-reporting old news as new,
     reference something as a follow-up) rather than treating each week in
     isolation.
     """
-    formatted, citation_map = _format_sources(sources)
+    formatted, items_meta = _format_sources(sources)
 
     if not formatted.strip():
         empty = "No notable news found for this week."
-        return {"btc": empty, "eth": empty, "general": empty}, {}
+        return {"btc": empty, "eth": empty, "general": empty}, []
 
     user_content = formatted
     if previous_digest:
@@ -207,7 +218,7 @@ def summarize_weekly_digest(
         elif current_key:
             sections[current_key] += line + "\n"
 
-    return {k: v.strip() for k, v in sections.items()}, citation_map
+    return {k: v.strip() for k, v in sections.items()}, items_meta
 
 
 if __name__ == "__main__":
@@ -237,12 +248,13 @@ if __name__ == "__main__":
             print(f"  found {len(posts)} posts")
 
     print("\nSummarizing...")
-    digest, citation_map = summarize_weekly_digest(sources)
+    digest, items_meta = summarize_weekly_digest(sources)
 
     for section in ["btc", "eth", "general"]:
         print(f"\n=== {section.upper()} ===")
         print(digest[section])
 
-    print(f"\n=== CITATIONS ({len(citation_map)}) ===")
-    for num, url in citation_map.items():
-        print(f"[{num}] {url}")
+    cited = [m for m in items_meta if m["citation_num"] is not None]
+    print(f"\n=== CITATIONS ({len(cited)}) ===")
+    for m in cited:
+        print(f"[{m['citation_num']}] {m['label']} -- {m['url']}")
