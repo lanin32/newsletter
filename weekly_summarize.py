@@ -101,8 +101,10 @@ Citations:
 - If several consecutive sentences all draw from the SAME citation number,
   only add it once, after the last of those sentences -- not after every
   single sentence.
-- Only cite X posts. Newsletter content has no citation numbers -- don't
-  invent one or attach a citation to something that came from a newsletter.
+- Only cite items that are explicitly tagged with a citation number (marked
+  "(citation #N)" in the raw material). Some newsletter emails have one, some
+  don't (depends whether a link to the original could be found) -- if an item
+  has no citation number, don't invent one or attach a citation to it.
 - Citation numbers only apply to THIS WEEK'S raw material. If a "LAST WEEK'S
   DIGEST" block is present for continuity, anything drawn from it should NOT
   get a citation number (it doesn't have one).
@@ -112,9 +114,10 @@ Citations:
 def _format_sources(sources: dict[str, list[dict]]) -> tuple[str, dict[int, str]]:
     """
     Returns (formatted_text, citation_map). citation_map maps citation number
-    -> tweet URL, for X posts only (newsletters aren't cited yet). Each X post
-    gets a stable number as it's formatted, so the model can cite it inline
-    and we can turn that number into a real link afterward.
+    -> URL. X posts always get a citation number; newsletter emails get one
+    only if a "view online" link could be extracted from the email (see
+    gmail_fetch.py) -- otherwise they're left uncited and just show up in the
+    "Sources this week" footer by title, for manual lookup.
     """
     blocks = []
     citation_map: dict[int, str] = {}
@@ -126,9 +129,18 @@ def _format_sources(sources: dict[str, list[dict]]) -> tuple[str, dict[int, str]
         item_texts = []
         for item in items:
             if "subject" in item:  # newsletter email
-                item_texts.append(
-                    f"[{item.get('date', '')}] Subject: {item['subject']}\n{item['body']}"
-                )
+                if item.get("url"):
+                    num = next_citation_num
+                    next_citation_num += 1
+                    citation_map[num] = item["url"]
+                    item_texts.append(
+                        f"[{item.get('date', '')}] (citation #{num}) "
+                        f"Subject: {item['subject']}\n{item['body']}"
+                    )
+                else:
+                    item_texts.append(
+                        f"[{item.get('date', '')}] Subject: {item['subject']}\n{item['body']}"
+                    )
             elif "username" in item:  # X post
                 num = next_citation_num
                 next_citation_num += 1

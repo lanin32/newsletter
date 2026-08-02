@@ -3,6 +3,7 @@ Fetches emails matching a Gmail search query from the last N days and
 returns their plain-text bodies.
 """
 import os
+import re
 import pickle
 import base64
 from datetime import datetime, timedelta, UTC
@@ -10,6 +11,21 @@ from googleapiclient.discovery import build
 from bs4 import BeautifulSoup
 
 TOKEN_PATH = os.environ.get("TOKEN_PATH", "token.pickle")
+
+# Matches the common "view this online" footer pattern used by most email
+# newsletter platforms (beehiiv, Substack, etc.) -- a trigger phrase followed
+# shortly by the actual public URL to the web version of the post.
+_VIEW_ONLINE_PATTERN = re.compile(
+    r"(?:view (?:the )?post online|view this post on the web|"
+    r"view in (?:your )?browser|read (?:it )?online)"
+    r"[^\n]*\n*\s*(https?://\S+)",
+    re.IGNORECASE,
+)
+
+
+def _extract_view_online_link(body: str) -> str | None:
+    match = _VIEW_ONLINE_PATTERN.search(body)
+    return match.group(1) if match else None
 
 
 def _get_service():
@@ -58,6 +74,7 @@ def _get_email(service, msg_id: str) -> dict:
         "subject": headers.get("Subject", "(no subject)"),
         "date": headers.get("Date", ""),
         "body": body,
+        "url": _extract_view_online_link(body),
     }
 
 
@@ -111,4 +128,5 @@ if __name__ == "__main__":
     )
     print(f"Found {len(emails)} emails")
     for e in emails:
-        print(f"- {e['subject']} ({e['date']}) — {len(e['body'])} chars")
+        url_note = e["url"] if e["url"] else "(no link found)"
+        print(f"- {e['subject']} ({e['date']}) — {len(e['body'])} chars — {url_note}")
