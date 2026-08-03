@@ -16,6 +16,7 @@ from monthly_summarize import summarize_token_digest
 from gmail_fetch import fetch_latest_email
 from gmail_send import send_email
 from citations import linkify_citations
+from email_render import render_cards, render_section
 
 
 def parse_previous_digest(text: str, symbols: list[str]) -> dict[str, str]:
@@ -72,25 +73,16 @@ def build_token_digests(config: dict, previous_sections: dict[str, str] | None =
 
 
 def build_email_html(digests: dict[str, str]) -> str:
-    def paragraph(text: str) -> str:
-        return "".join(
-            f'<p style="margin: 0 0 12px 0; color: #333333; font-size: 14px; line-height: 1.6; font-family: sans-serif;">{chunk.strip()}</p>'
-            for chunk in text.split("\n\n") if chunk.strip()
-        )
+    # Neutral scheme for all tokens for now -- could go per-token later
+    ACCENT = "#555555"
+    CARD_BG = "#f2f2f2"
 
-    def section(symbol: str, body: str) -> str:
-        return f"""
-        <tr>
-          <td style="padding: 20px 32px; border-left: 4px solid #888888;">
-            <h2 style="margin: 0 0 10px 0; font-size: 17px; color: #111111; font-family: sans-serif;">
-              {symbol}
-            </h2>
-            {paragraph(body)}
-          </td>
-        </tr>
-        """
+    sections_html = "".join(
+        render_section(symbol, ACCENT, render_cards(body, CARD_BG))
+        for symbol, body in digests.items()
+    )
 
-    sections_html = "".join(section(symbol, body) for symbol, body in digests.items())
+    today_str = date.today().strftime("%B %Y")
 
     return f"""
     <html>
@@ -103,17 +95,20 @@ def build_email_html(digests: dict[str, str]) -> str:
           <tr>
             <td align="center">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
-                     style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #e0e0e0; max-width: 600px;">
+                     style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #e0e0e0; max-width: 680px;">
                 <tr>
-                  <td style="padding: 20px 32px; background-color: #1a1a1a;">
-                    <h1 style="margin: 0; font-size: 18px; color: #ffffff; font-family: sans-serif;">
-                      Crypto Monthly Digest — Small Caps
-                    </h1>
-                    <span style="color: #aaaaaa; font-size: 12px; font-family: sans-serif;">
-                      {date.today().strftime('%B %Y')}
+                  <td style="background-color: #111111; padding: 18px 8px;">
+                    <span style="color: #ffffff; font-size: 20px; font-weight: bold; font-family: sans-serif;">
+                      Crypto Monthly Digest — Small/Mid Caps
+                    </span>
+                    <br>
+                    <span style="color: #aaaaaa; font-size: 13px; font-family: sans-serif;">
+                      {today_str}
                     </span>
                   </td>
                 </tr>
+                <tr><td style="height: 8px;"></td></tr>
+
                 {sections_html}
               </table>
             </td>

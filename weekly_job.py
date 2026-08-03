@@ -6,7 +6,6 @@ Usage:
     python weekly_job.py
 """
 from datetime import date
-import re
 import time
 import yaml
 
@@ -15,6 +14,7 @@ from x_fetch import fetch_x_posts
 from weekly_summarize import summarize_weekly_digest
 from gmail_send import send_email
 from citations import linkify_citations
+from email_render import render_cards, render_section
 
 
 def build_sources(config: dict) -> dict:
@@ -78,56 +78,14 @@ def build_sources_footer_html(items_meta: list[dict]) -> str:
     """
 
 
-_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9])")
-
-
 def build_email_html(digest: dict[str, str], items_meta: list[dict]) -> str:
     citation_map = {
         m["citation_num"]: m["url"] for m in items_meta if m["citation_num"] is not None
     }
 
-    def cards(text: str, bg_color: str) -> str:
+    def section(title: str, accent_color: str, text: str, bg_color: str) -> str:
         linked = linkify_citations(text, citation_map)
-        card_blocks = []
-        for chunk in linked.split("\n\n"):
-            chunk = chunk.strip()
-            if not chunk:
-                continue
-            sentences = [s.strip() for s in _SENTENCE_SPLIT.split(chunk) if s.strip()]
-            sentence_html = "".join(
-                f'<p style="margin: 0 0 5px 0; color: #333333; font-size: 13px; line-height: 1.45;">{s}</p>'
-                for s in sentences
-            )
-            card_blocks.append(
-                f'<div style="background-color: {bg_color}; border-radius: 10px; '
-                f'padding: 12px 14px; margin-bottom: 8px;">{sentence_html}</div>'
-            )
-        return "".join(card_blocks)
-
-    def section(title: str, accent_color: str, content: str) -> str:
-        return f"""
-        <tr><td style="height: 16px;"></td></tr>
-        <tr>
-          <td style="padding: 0 8px;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-              <tr>
-                <td style="padding: 8px 0; text-align: center;
-                           border-top: 2px solid {accent_color}; border-bottom: 2px solid {accent_color};">
-                  <span style="color: {accent_color}; font-size: 22px; font-weight: bold; letter-spacing: 0.5px;
-                               font-family: Georgia, 'Times New Roman', serif;">
-                    {title}
-                  </span>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding: 12px 8px 4px;">
-            {content}
-          </td>
-        </tr>
-        """
+        return render_section(title, accent_color, render_cards(linked, bg_color))
 
     today_str = date.today().strftime("%B %d, %Y")
 
@@ -156,9 +114,9 @@ def build_email_html(digest: dict[str, str], items_meta: list[dict]) -> str:
                 </tr>
                 <tr><td style="height: 8px;"></td></tr>
 
-                {section("Bitcoin", "#c76b00", cards(digest['btc'], "#fdf1e0"))}
-                {section("Ethereum", "#4c5fd1", cards(digest['eth'], "#eef0fc"))}
-                {section("General Market", "#555555", cards(digest['general'], "#f2f2f2"))}
+                {section("Bitcoin", "#c76b00", digest['btc'], "#fdf1e0")}
+                {section("Ethereum", "#4c5fd1", digest['eth'], "#eef0fc")}
+                {section("General Market", "#555555", digest['general'], "#f2f2f2")}
 
                 <tr>
                   <td style="padding: 14px 8px; background-color: #fafafa; border-top: 1px solid #eeeeee;">
