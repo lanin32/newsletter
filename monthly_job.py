@@ -72,6 +72,12 @@ def build_token_digests(config: dict, previous_sections: dict[str, str] | None =
 
 
 def build_email_html(digests: dict[str, str]) -> str:
+    def paragraph(text: str) -> str:
+        return "".join(
+            f'<p style="margin: 0 0 12px 0; color: #333333; font-size: 14px; line-height: 1.6; font-family: sans-serif;">{chunk.strip()}</p>'
+            for chunk in text.split("\n\n") if chunk.strip()
+        )
+
     def section(symbol: str, body: str) -> str:
         return f"""
         <tr>
@@ -79,9 +85,7 @@ def build_email_html(digests: dict[str, str]) -> str:
             <h2 style="margin: 0 0 10px 0; font-size: 17px; color: #111111; font-family: sans-serif;">
               {symbol}
             </h2>
-            <p style="margin: 0; color: #333333; font-size: 14px; line-height: 1.6; font-family: sans-serif;">
-              {body}
-            </p>
+            {paragraph(body)}
           </td>
         </tr>
         """

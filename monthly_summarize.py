@@ -1,7 +1,7 @@
 """
-Summarizes one obscure token's X activity for the month into a single
-paragraph. Called once per token -- no pooling across tokens, since there's
-no cross-project routing/dedup problem to solve (unlike the weekly digest).
+Summarizes one obscure token's X activity for the month. Called once per
+token -- no pooling across tokens, since there's no cross-project routing/
+dedup problem to solve (unlike the weekly digest).
 """
 import os
 from openai import OpenAI
@@ -15,7 +15,7 @@ members, official account, etc.) over the past month.
 Note: X posts are short, informal, and may be fragmentary or reference things
 without full context -- read them accordingly.
 
-Write a single digest paragraph, 4-8 sentences depending on how much happened:
+Write the digest, 4-8 sentences depending on how much happened:
 - Cover what actually happened: development progress, releases, partnerships,
   adoption signals, community milestones -- for a smaller project, development
   updates ARE often the news, so don't deprioritize them the way a mature/major
@@ -37,6 +37,10 @@ Write a single digest paragraph, 4-8 sentences depending on how much happened:
   caused it), describe the event, not the chart.
 - Plain prose, no bullet points, no headers.
 - No fluff, no "in conclusion", no restating that this is a summary.
+- If there's enough distinct material to group (e.g. development news vs.
+  community/ecosystem news), split into separate paragraphs with a blank line
+  between them. Most months this will be short enough to stay as one paragraph
+  -- only split when there's genuinely enough to group.
 - If genuinely nothing noteworthy happened this month, say so in one sentence
   rather than padding.
 
