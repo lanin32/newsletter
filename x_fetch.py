@@ -37,7 +37,7 @@ def _get_user_posts(user_id: str, lookback_days: int) -> list[dict]:
             "max_results": 100,
             "start_time": start_time,
             "exclude": "retweets,replies",
-            "tweet.fields": "created_at",
+            "tweet.fields": "created_at,note_tweet",
         },
     )
 
@@ -54,7 +54,7 @@ def _get_user_posts(user_id: str, lookback_days: int) -> list[dict]:
                 "max_results": 100,
                 "start_time": start_time,
                 "exclude": "retweets,replies",
-                "tweet.fields": "created_at",
+                "tweet.fields": "created_at,note_tweet",
             },
         )
 
@@ -78,20 +78,24 @@ def fetch_x_posts(username: str, lookback_days: int = 7) -> list[dict]:
     posts = _get_user_posts(user_id, lookback_days)
     # X returns posts newest-first; reverse to oldest-first so threads read
     # in logical order and later posts can correctly reference earlier ones
-    return [
-        {
+    result = []
+    for post in reversed(posts):
+        # long-form "Note Tweets" (the ones with a "Show more" button in the
+        # UI) get truncated in the default text field -- the full text only
+        # shows up in note_tweet.text when present
+        full_text = post.get("note_tweet", {}).get("text") or post["text"]
+        result.append({
             "username": username,
-            "text": post["text"],
+            "text": full_text,
             "date": post.get("created_at", ""),
             "id": post["id"],
-        }
-        for post in reversed(posts)
-    ]
+        })
+    return result
 
 
 if __name__ == "__main__":
     # quick manual test
-    posts = fetch_x_posts("VitalikButerin", lookback_days=7)
+    posts = fetch_x_posts("danheld", lookback_days=7)
     print(f"\nFound {len(posts)} posts")
     for p in posts:
-        print(f"- @{p['username']} ({p['date']}): {p['text'][:80]}...")
+        print(f"- @{p['username']} ({p['date']}): {p['text']}...")
