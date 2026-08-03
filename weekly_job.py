@@ -6,6 +6,7 @@ Usage:
     python weekly_job.py
 """
 from datetime import date
+import re
 import time
 import yaml
 
@@ -77,29 +78,55 @@ def build_sources_footer_html(items_meta: list[dict]) -> str:
     """
 
 
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9])")
+
+
 def build_email_html(digest: dict[str, str], items_meta: list[dict]) -> str:
     citation_map = {
         m["citation_num"]: m["url"] for m in items_meta if m["citation_num"] is not None
     }
 
-    def paragraph(text: str) -> str:
+    def cards(text: str, bg_color: str) -> str:
         linked = linkify_citations(text, citation_map)
-        return "".join(
-            f'<p style="margin: 0 0 12px 0; color: #333333; font-size: 14px; line-height: 1.6;">{chunk.strip()}</p>'
-            for chunk in linked.split("\n\n") if chunk.strip()
-        )
+        card_blocks = []
+        for chunk in linked.split("\n\n"):
+            chunk = chunk.strip()
+            if not chunk:
+                continue
+            sentences = [s.strip() for s in _SENTENCE_SPLIT.split(chunk) if s.strip()]
+            sentence_html = "".join(
+                f'<p style="margin: 0 0 5px 0; color: #333333; font-size: 13px; line-height: 1.45;">{s}</p>'
+                for s in sentences
+            )
+            card_blocks.append(
+                f'<div style="background-color: {bg_color}; border-radius: 10px; '
+                f'padding: 12px 14px; margin-bottom: 8px;">{sentence_html}</div>'
+            )
+        return "".join(card_blocks)
 
     def section(title: str, accent_color: str, content: str) -> str:
         return f"""
+        <tr><td style="height: 16px;"></td></tr>
         <tr>
-          <td style="padding: 24px 32px; border-left: 4px solid {accent_color};">
-            <h2 style="margin: 0 0 12px 0; font-size: 17px; color: #111111; font-family: sans-serif;">
-              {title}
-            </h2>
+          <td style="padding: 0 8px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="padding: 8px 0; text-align: center;
+                           border-top: 2px solid {accent_color}; border-bottom: 2px solid {accent_color};">
+                  <span style="color: {accent_color}; font-size: 22px; font-weight: bold; letter-spacing: 0.5px;
+                               font-family: Georgia, 'Times New Roman', serif;">
+                    {title}
+                  </span>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 12px 8px 4px;">
             {content}
           </td>
         </tr>
-        <tr><td style="height: 8px;"></td></tr>
         """
 
     today_str = date.today().strftime("%B %d, %Y")
@@ -115,9 +142,9 @@ def build_email_html(digest: dict[str, str], items_meta: list[dict]) -> str:
           <tr>
             <td align="center">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
-                     style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #e0e0e0; max-width: 600px;">
+                     style="background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #e0e0e0; max-width: 680px;">
                 <tr>
-                  <td style="background-color: #111111; padding: 20px 32px;">
+                  <td style="background-color: #111111; padding: 18px 8px;">
                     <span style="color: #ffffff; font-size: 20px; font-weight: bold; font-family: sans-serif;">
                       Crypto Weekly
                     </span>
@@ -129,12 +156,12 @@ def build_email_html(digest: dict[str, str], items_meta: list[dict]) -> str:
                 </tr>
                 <tr><td style="height: 8px;"></td></tr>
 
-                {section("Bitcoin", "#f7931a", paragraph(digest['btc']))}
-                {section("Ethereum", "#627eea", paragraph(digest['eth']))}
-                {section("General Market", "#888888", paragraph(digest['general']))}
+                {section("Bitcoin", "#c76b00", cards(digest['btc'], "#fdf1e0"))}
+                {section("Ethereum", "#4c5fd1", cards(digest['eth'], "#eef0fc"))}
+                {section("General Market", "#555555", cards(digest['general'], "#f2f2f2"))}
 
                 <tr>
-                  <td style="padding: 16px 32px; background-color: #fafafa; border-top: 1px solid #eeeeee;">
+                  <td style="padding: 14px 8px; background-color: #fafafa; border-top: 1px solid #eeeeee;">
                     {build_sources_footer_html(items_meta)}
                   </td>
                 </tr>
