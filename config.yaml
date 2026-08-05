@@ -9,11 +9,25 @@ newsletters:
     gmail_query: "from:REPLACE_ME"   # fill in once you see the actual sender address
     lookback_days: 7
 
+# An entry can be a plain username string (all posts, no filter) or a dict
+# {username, phrases} -- if phrases is non-empty, the fetch is done via
+# X's search API with a `from:username ("phrase1" OR "phrase2")` query, so
+# only matching posts are fetched server-side (cheaper + faster than
+# fetching everything and filtering locally). Each phrase must appear
+# verbatim (X's quoted-phrase search, not a loose substring match) in a
+# post for it to be kept -- any one phrase matching is enough.
+#
+# NOTE on YAML indentation for a dict entry: "phrases:" must line up with
+# "username:", i.e. 2 spaces past the "- ", not level with the dash itself.
+#   - username: REPLACE_ME
+#     phrases:
+#       - "REPLACE_ME"
 x_accounts:
-  BTC:
-    - DanHeld
-  ETH:
-    - VitalikButerin
+  - DanHeld
+  - VitalikButerin
+  - username: VirtualBacon
+    phrases:
+      - "most important market events over the last 24 hours"
 
 email:
   to: "lyubo.anin@gmail.com"   # where the digest gets sent

@@ -240,12 +240,17 @@ if __name__ == "__main__":
         sources[f"{nl['name']} (newsletter)"] = emails
         print(f"  found {len(emails)} emails")
 
-    for token, accounts in config.get("x_accounts", {}).items():
-        for account in accounts:
-            print(f"Fetching @{account} ({token})...")
-            posts = fetch_x_posts(account, lookback_days=7)
-            sources[f"{account} (X posts)"] = posts
-            print(f"  found {len(posts)} posts")
+    for account in config.get("x_accounts", []):
+        if isinstance(account, dict):
+            username = account["username"]
+            phrases = account.get("phrases", [])
+        else:
+            username = account
+            phrases = []
+        print(f"Fetching @{username}...")
+        posts = fetch_x_posts(username, lookback_days=7, phrases=phrases)
+        sources[f"{username} (X posts)"] = posts
+        print(f"  found {len(posts)} posts")
 
     print("\nSummarizing...")
     digest, items_meta = summarize_weekly_digest(sources)

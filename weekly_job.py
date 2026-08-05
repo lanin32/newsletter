@@ -29,12 +29,20 @@ def build_sources(config: dict) -> dict:
         sources[f"{nl['name']} (newsletter)"] = emails
         print(f"  found {len(emails)} emails")
 
-    for token, accounts in config.get("x_accounts", {}).items():
-        for account in accounts:
-            posts = fetch_x_posts(account, lookback_days=7)
-            sources[f"{account} (X posts)"] = posts
-            print(f"  found {len(posts)} posts")
-            time.sleep(1)  # small buffer between accounts to be polite to rate limits
+    for account in config.get("x_accounts", []):
+        # an account entry is either a plain username string (no filter)
+        # or a dict {username, phrases} to only keep posts containing
+        # at least one of the given phrases
+        if isinstance(account, dict):
+            username = account["username"]
+            phrases = account.get("phrases", [])
+        else:
+            username = account
+            phrases = []
+        posts = fetch_x_posts(username, lookback_days=7, phrases=phrases)
+        sources[f"{username} (X posts)"] = posts
+        print(f"  found {len(posts)} posts")
+        time.sleep(1)  # small buffer between accounts to be polite to rate limits
 
     return sources
 
