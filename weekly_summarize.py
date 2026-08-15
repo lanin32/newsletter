@@ -101,6 +101,9 @@ Citations:
 - If several consecutive sentences all draw from the SAME citation number,
   only add it once, after the last of those sentences -- not after every
   single sentence.
+- If a single sentence draws on multiple DIFFERENT citation numbers, give each
+  its own bracket immediately after one another, e.g. "...happened this week
+  [2][4][5]." -- never combine them into one bracket like "[2, 4, 5]".
 - Only cite items that are explicitly tagged with a citation number (marked
   "(citation #N)" in the raw material). Some newsletter emails have one, some
   don't (depends whether a link to the original could be found) -- if an item

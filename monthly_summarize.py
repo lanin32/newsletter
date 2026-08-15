@@ -56,6 +56,9 @@ Citations:
 - If several consecutive sentences all draw from the SAME citation number,
   only add it once, after the last of those sentences -- not after every
   single sentence.
+- If a single sentence draws on multiple DIFFERENT citation numbers, give each
+  its own bracket immediately after one another, e.g. "...happened this month
+  [2][4][5]." -- never combine them into one bracket like "[2, 4, 5]".
 - Citation numbers only apply to THIS MONTH'S raw material. If a "PREVIOUS
   MONTH'S DIGEST" block is present for continuity, anything drawn from it
   should NOT get a citation number (it doesn't have one).
