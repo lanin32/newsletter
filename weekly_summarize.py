@@ -17,6 +17,12 @@ from openai import OpenAI
 
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"].strip())
 
+# Switched from gpt-4.1 (30k TPM on our account tier, which this request
+# regularly exceeded) to gpt-5.6-luna: ~10x cheaper, newer generation, and
+# a much higher TPM ceiling. Override locally for a side-by-side comparison
+# without editing code, e.g.: SUMMARIZE_MODEL=gpt-4.1 python weekly_job.py
+MODEL = os.environ.get("SUMMARIZE_MODEL", "gpt-5.6-luna")
+
 SYSTEM_PROMPT = """You are building a personal weekly crypto digest email from raw
 material pulled from several sources -- newsletters and X (Twitter) posts. You will
 be given the raw content, labeled by which source it came from.
@@ -195,8 +201,13 @@ def summarize_weekly_digest(
         )
 
     response = client.chat.completions.create(
-        model="gpt-4.1",
-        max_tokens=2500,
+        model=MODEL,
+        max_completion_tokens=10000,
+        # This is plain prose generation/routing, not multi-step reasoning --
+        # "low" avoids spending the token budget on hidden reasoning tokens
+        # the model doesn't need for this task (max_completion_tokens covers
+        # both those and the visible output, unlike the old max_tokens).
+        reasoning_effort="low",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_content},
@@ -204,7 +215,7 @@ def summarize_weekly_digest(
     )
 
     if response.choices[0].finish_reason == "length":
-        print("  WARNING: response was cut off by max_tokens -- consider raising it further")
+        print("  WARNING: response was cut off by max_completion_tokens -- consider raising it further")
 
     text = response.choices[0].message.content
 

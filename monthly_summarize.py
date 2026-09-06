@@ -8,6 +8,12 @@ from openai import OpenAI
 
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"].strip())
 
+# See weekly_summarize.py for the reasoning behind this switch. Override
+# locally for comparison, e.g.: SUMMARIZE_MODEL=gpt-4.1 python monthly_job.py
+MODEL = os.environ.get("SUMMARIZE_MODEL", "gpt-5.6-luna")
+
+
+
 SYSTEM_PROMPT = """You are building a personal monthly digest of a single, smaller
 crypto project's activity, based on that project's own X (Twitter) accounts (team
 members, official account, etc.) over the past month.
@@ -101,8 +107,11 @@ def summarize_token_digest(
         )
 
     response = client.chat.completions.create(
-        model="gpt-4.1",
-        max_tokens=400,
+        model=MODEL,
+        max_completion_tokens=3000,
+        # See weekly_summarize.py for why: plain prose here, no need to
+        # spend budget on hidden reasoning tokens.
+        reasoning_effort="low",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_content},
