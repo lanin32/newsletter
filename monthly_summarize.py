@@ -10,9 +10,10 @@ client = OpenAI(api_key=os.environ["OPENAI_API_KEY"].strip())
 
 # See weekly_summarize.py for the reasoning behind this switch. Override
 # locally for comparison, e.g.: SUMMARIZE_MODEL=gpt-4.1 python monthly_job.py
-MODEL = os.environ.get("SUMMARIZE_MODEL", "gpt-5.6-luna")
-
-
+MODEL = os.environ.get("SUMMARIZE_MODEL", "gpt-6-luna")
+# Override for testing without a code edit, e.g.:
+# REASONING_EFFORT=medium python monthly_job.py
+REASONING_EFFORT = os.environ.get("REASONING_EFFORT", "low")
 
 SYSTEM_PROMPT = """You are building a personal monthly digest of a single, smaller
 crypto project's activity, based on that project's own X (Twitter) accounts (team
@@ -111,14 +112,27 @@ def summarize_token_digest(
         max_completion_tokens=3000,
         # See weekly_summarize.py for why: plain prose here, no need to
         # spend budget on hidden reasoning tokens.
-        reasoning_effort="low",
+        reasoning_effort=REASONING_EFFORT,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_content},
         ],
     )
 
-    return response.choices[0].message.content.strip(), citation_map
+    usage = response.usage
+    reasoning_tokens = getattr(usage.completion_tokens_details, "reasoning_tokens", None) if usage.completion_tokens_details else None
+    print(
+        f"  Usage ({token_symbol}) -- model: {MODEL}, reasoning_effort: {REASONING_EFFORT}, "
+        f"prompt: {usage.prompt_tokens}, completion: {usage.completion_tokens} "
+        f"(of which reasoning: {reasoning_tokens}), total: {usage.total_tokens}"
+    )
+
+    text = response.choices[0].message.content
+    if not text:
+        print(f"  WARNING: empty response content for {token_symbol}")
+        text = ""
+
+    return text.strip(), citation_map
 
 
 if __name__ == "__main__":

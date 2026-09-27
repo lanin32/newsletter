@@ -8,6 +8,7 @@ Usage:
     python monthly_job.py
 """
 from datetime import date
+import os
 import time
 import yaml
 
@@ -126,15 +127,22 @@ def main():
     monthly_cfg = config["monthly"]
     email_cfg = config["email"]
 
-    print("Checking for last month's digest (for continuity)...")
-    previous = fetch_latest_email(f'subject:"{monthly_cfg["subject"]}"')
+    # See weekly_job.py for why this is toggleable -- same rationale, same
+    # env var. Defaults on for real/scheduled use.
+    continuity_enabled = os.environ.get("DISABLE_CONTINUITY", "").lower() not in ("1", "true", "yes")
+
     previous_sections = {}
-    if previous:
-        symbols = [t["symbol"] for t in monthly_cfg.get("tokens", [])]
-        previous_sections = parse_previous_digest(previous["body"], symbols)
-        print(f"  found one from {previous['date']}, parsed {len(previous_sections)} token section(s)")
+    if continuity_enabled:
+        print("Checking for last month's digest (for continuity)...")
+        previous = fetch_latest_email(f'subject:"{monthly_cfg["subject"]}"')
+        if previous:
+            symbols = [t["symbol"] for t in monthly_cfg.get("tokens", [])]
+            previous_sections = parse_previous_digest(previous["body"], symbols)
+            print(f"  found one from {previous['date']}, parsed {len(previous_sections)} token section(s)")
+        else:
+            print("  none found (first run?)")
     else:
-        print("  none found (first run?)")
+        print("Continuity disabled (DISABLE_CONTINUITY set) -- skipping last digest lookup.")
 
     digests = build_token_digests(config, previous_sections=previous_sections)
 

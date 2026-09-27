@@ -6,6 +6,7 @@ Usage:
     python weekly_job.py
 """
 from datetime import date
+import os
 import time
 import yaml
 
@@ -146,13 +147,26 @@ def main():
 
     email_cfg = config["email"]
 
-    print("Checking for last week's digest (for continuity)...")
-    previous = fetch_latest_email(f'subject:"{email_cfg["subject"]}"')
-    previous_digest = previous["body"] if previous else None
-    if previous:
-        print(f"  found one from {previous['date']}")
+    # Continuity (passing last time's digest so the model doesn't repeat old
+    # news as new) is genuinely useful for real scheduled runs, a week apart --
+    # but actively harmful when testing multiple runs close together, since
+    # the "previous" digest ends up nearly identical to this run's fresh
+    # material, and the model correctly (per its instructions) suppresses
+    # most of it as stale. Defaults on for real/scheduled use; disable for
+    # ad hoc local testing with: DISABLE_CONTINUITY=true python weekly_job.py
+    continuity_enabled = os.environ.get("DISABLE_CONTINUITY", "").lower() not in ("1", "true", "yes")
+
+    previous_digest = None
+    if continuity_enabled:
+        print("Checking for last week's digest (for continuity)...")
+        previous = fetch_latest_email(f'subject:"{email_cfg["subject"]}"')
+        previous_digest = previous["body"] if previous else None
+        if previous:
+            print(f"  found one from {previous['date']}")
+        else:
+            print("  none found (first run?)")
     else:
-        print("  none found (first run?)")
+        print("Continuity disabled (DISABLE_CONTINUITY set) -- skipping last digest lookup.")
 
     sources = build_sources(config)
 

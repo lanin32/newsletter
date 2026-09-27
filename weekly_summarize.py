@@ -21,7 +21,14 @@ client = OpenAI(api_key=os.environ["OPENAI_API_KEY"].strip())
 # regularly exceeded) to gpt-5.6-luna: ~10x cheaper, newer generation, and
 # a much higher TPM ceiling. Override locally for a side-by-side comparison
 # without editing code, e.g.: SUMMARIZE_MODEL=gpt-4.1 python weekly_job.py
-MODEL = os.environ.get("SUMMARIZE_MODEL", "gpt-5.6-luna")
+MODEL = os.environ.get("SUMMARIZE_MODEL", "gpt-6-luna")
+# "low" is OpenAI's own recommendation for "simple summaries, routing,
+# straightforward generation" (which matches this task), but there are
+# documented reports of Luna-tier models silently truncating/emptying long,
+# strictly-structured completions at low effort -- exactly this task's shape
+# (long pooled input, one long delimited multi-section response). Override
+# for testing without a code edit, e.g.: REASONING_EFFORT=medium python weekly_job.py
+REASONING_EFFORT = os.environ.get("REASONING_EFFORT", "low")
 
 SYSTEM_PROMPT = """You are building a personal weekly crypto digest email from raw
 material pulled from several sources -- newsletters and X (Twitter) posts. You will
@@ -207,17 +214,28 @@ def summarize_weekly_digest(
         # "low" avoids spending the token budget on hidden reasoning tokens
         # the model doesn't need for this task (max_completion_tokens covers
         # both those and the visible output, unlike the old max_tokens).
-        reasoning_effort="low",
+        reasoning_effort=REASONING_EFFORT,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_content},
         ],
     )
 
+    usage = response.usage
+    reasoning_tokens = getattr(usage.completion_tokens_details, "reasoning_tokens", None) if usage.completion_tokens_details else None
+    print(
+        f"  Usage -- model: {MODEL}, reasoning_effort: {REASONING_EFFORT}, "
+        f"prompt: {usage.prompt_tokens}, completion: {usage.completion_tokens} "
+        f"(of which reasoning: {reasoning_tokens}), total: {usage.total_tokens}"
+    )
+
     if response.choices[0].finish_reason == "length":
         print("  WARNING: response was cut off by max_completion_tokens -- consider raising it further")
 
     text = response.choices[0].message.content
+    if not text:
+        print("  WARNING: empty response content -- see the known Luna-tier issue with long structured completions")
+        text = ""
 
     sections = {"btc": "", "eth": "", "general": ""}
     current_key = None
