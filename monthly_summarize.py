@@ -14,6 +14,9 @@ MODEL = os.environ.get("SUMMARIZE_MODEL", "gpt-6-luna")
 # Override for testing without a code edit, e.g.:
 # REASONING_EFFORT=medium python monthly_job.py
 REASONING_EFFORT = os.environ.get("REASONING_EFFORT", "low")
+# See weekly_summarize.py for details on both of these.
+REASONING_MODE = os.environ.get("REASONING_MODE", "standard")
+ENABLE_REASONING_SUMMARY = os.environ.get("ENABLE_REASONING_SUMMARY", "true").lower() not in ("0", "false", "no")
 
 SYSTEM_PROMPT = """You are building a personal monthly digest of a single, smaller
 crypto project's activity, based on that project's own X (Twitter) accounts (team
@@ -107,27 +110,53 @@ def summarize_token_digest(
             f"=== THIS MONTH'S RAW MATERIAL ===\n{formatted}"
         )
 
-    response = client.chat.completions.create(
-        model=MODEL,
-        max_completion_tokens=3000,
-        # See weekly_summarize.py for why: plain prose here, no need to
-        # spend budget on hidden reasoning tokens.
-        reasoning_effort=REASONING_EFFORT,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_content},
-        ],
-    )
+    reasoning_config = {"effort": REASONING_EFFORT, "mode": REASONING_MODE}
+    if ENABLE_REASONING_SUMMARY:
+        reasoning_config["summary"] = "auto"
+
+    input_items = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": user_content},
+    ]
+    create_kwargs = dict(model=MODEL, max_output_tokens=25000, reasoning=reasoning_config, input=input_items)
+
+    try:
+        response = client.responses.create(**create_kwargs)
+    except Exception as e:
+        err = str(e).lower()
+        # See weekly_summarize.py: unverified orgs get a 400 on the
+        # "summary" param specifically -- fall back rather than fail.
+        if ENABLE_REASONING_SUMMARY and "summary" in err and "verif" in err:
+            print(f"  Reasoning summary unavailable (org not verified) -- retrying without it ({token_symbol}).")
+            reasoning_config.pop("summary", None)
+            create_kwargs["reasoning"] = reasoning_config
+            response = client.responses.create(**create_kwargs)
+        # Non-reasoning models (e.g. gpt-4.1) may reject "reasoning" outright.
+        elif "reasoning" in err and ("unsupported" in err or "not supported" in err or "unknown" in err):
+            print(f"  Model {MODEL} doesn't support the reasoning param -- retrying without it ({token_symbol}).")
+            create_kwargs.pop("reasoning", None)
+            response = client.responses.create(**create_kwargs)
+        else:
+            raise
 
     usage = response.usage
-    reasoning_tokens = getattr(usage.completion_tokens_details, "reasoning_tokens", None) if usage.completion_tokens_details else None
+    reasoning_tokens = usage.output_tokens_details.reasoning_tokens if usage.output_tokens_details else None
     print(
-        f"  Usage ({token_symbol}) -- model: {MODEL}, reasoning_effort: {REASONING_EFFORT}, "
-        f"prompt: {usage.prompt_tokens}, completion: {usage.completion_tokens} "
+        f"  Usage ({token_symbol}) -- model: {MODEL}, reasoning_effort: {REASONING_EFFORT}, reasoning_mode: {REASONING_MODE}, "
+        f"input: {usage.input_tokens}, output: {usage.output_tokens} "
         f"(of which reasoning: {reasoning_tokens}), total: {usage.total_tokens}"
     )
 
-    text = response.choices[0].message.content
+    for item in response.output:
+        if item.type == "reasoning" and item.summary:
+            for s in item.summary:
+                print(f"  Reasoning summary ({token_symbol}): {s.text}")
+
+    if response.status == "incomplete":
+        reason = response.incomplete_details.reason if response.incomplete_details else "unknown"
+        print(f"  WARNING: response incomplete ({reason}) for {token_symbol}")
+
+    text = response.output_text
     if not text:
         print(f"  WARNING: empty response content for {token_symbol}")
         text = ""

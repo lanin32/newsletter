@@ -29,6 +29,17 @@ MODEL = os.environ.get("SUMMARIZE_MODEL", "gpt-6-luna")
 # (long pooled input, one long delimited multi-section response). Override
 # for testing without a code edit, e.g.: REASONING_EFFORT=medium python weekly_job.py
 REASONING_EFFORT = os.environ.get("REASONING_EFFORT", "low")
+# "standard" is the default/only option Chat Completions effectively used;
+# "pro" triggers deeper multi-pass reasoning before a single final answer,
+# intended for quality-first tasks. Independent of REASONING_EFFORT. Override:
+# REASONING_MODE=pro python weekly_job.py
+REASONING_MODE = os.environ.get("REASONING_MODE", "standard")
+# Reasoning summaries are a natural-language paraphrase of the model's
+# internal reasoning -- purely informational, no effect on the actual
+# answer. Requires the OpenAI org to be verified or every call 400s; we
+# detect that specific failure below and fall back to no summary rather
+# than crash the job. Disable with ENABLE_REASONING_SUMMARY=false.
+ENABLE_REASONING_SUMMARY = os.environ.get("ENABLE_REASONING_SUMMARY", "true").lower() not in ("0", "false", "no")
 
 SYSTEM_PROMPT = """You are building a personal weekly crypto digest email from raw
 material pulled from several sources -- newsletters and X (Twitter) posts. You will
@@ -99,7 +110,8 @@ Content priorities (apply to all three sections):
 
 Style:
 - Plain prose, no bullet points, no sub-headers within a section
-- No fluff, no "in conclusion", no restating that this is a summary
+- No fluff, no "in conclusion", no restating that this is a summary,
+  but also do not just skip stories that are relevant.
 - Within each section, group related stories into separate paragraphs, with a
   blank line between paragraphs -- don't write one continuous block. For
   example, institutional/corporate news might be one paragraph, regulatory
@@ -207,32 +219,59 @@ def summarize_weekly_digest(
             f"=== THIS WEEK'S RAW MATERIAL ===\n{formatted}"
         )
 
-    response = client.chat.completions.create(
-        model=MODEL,
-        max_completion_tokens=10000,
-        # This is plain prose generation/routing, not multi-step reasoning --
-        # "low" avoids spending the token budget on hidden reasoning tokens
-        # the model doesn't need for this task (max_completion_tokens covers
-        # both those and the visible output, unlike the old max_tokens).
-        reasoning_effort=REASONING_EFFORT,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_content},
-        ],
-    )
+    reasoning_config = {"effort": REASONING_EFFORT, "mode": REASONING_MODE}
+    if ENABLE_REASONING_SUMMARY:
+        reasoning_config["summary"] = "auto"
+
+    input_items = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": user_content},
+    ]
+    # OpenAI's own guidance: reserve at least 25,000 tokens for reasoning +
+    # output when starting out with these models -- our old 10,000 cap is
+    # likely why xhigh ran out of budget before producing any visible text.
+    create_kwargs = dict(model=MODEL, max_output_tokens=25000, reasoning=reasoning_config, input=input_items)
+
+    try:
+        response = client.responses.create(**create_kwargs)
+    except Exception as e:
+        err = str(e).lower()
+        # Reasoning summaries require org verification; an unverified org
+        # gets a 400 on the "summary" param specifically. Fall back to no
+        # summary rather than fail the whole run over an optional extra.
+        if ENABLE_REASONING_SUMMARY and "summary" in err and "verif" in err:
+            print("  Reasoning summary unavailable (org not verified) -- retrying without it.")
+            print("  To enable it: https://platform.openai.com/settings/organization/general")
+            reasoning_config.pop("summary", None)
+            create_kwargs["reasoning"] = reasoning_config
+            response = client.responses.create(**create_kwargs)
+        # Non-reasoning models (e.g. gpt-4.1) may reject the "reasoning"
+        # param outright -- drop it entirely and retry rather than fail.
+        elif "reasoning" in err and ("unsupported" in err or "not supported" in err or "unknown" in err):
+            print(f"  Model {MODEL} doesn't support the reasoning param -- retrying without it.")
+            create_kwargs.pop("reasoning", None)
+            response = client.responses.create(**create_kwargs)
+        else:
+            raise
 
     usage = response.usage
-    reasoning_tokens = getattr(usage.completion_tokens_details, "reasoning_tokens", None) if usage.completion_tokens_details else None
+    reasoning_tokens = usage.output_tokens_details.reasoning_tokens if usage.output_tokens_details else None
     print(
-        f"  Usage -- model: {MODEL}, reasoning_effort: {REASONING_EFFORT}, "
-        f"prompt: {usage.prompt_tokens}, completion: {usage.completion_tokens} "
+        f"  Usage -- model: {MODEL}, reasoning_effort: {REASONING_EFFORT}, reasoning_mode: {REASONING_MODE}, "
+        f"input: {usage.input_tokens}, output: {usage.output_tokens} "
         f"(of which reasoning: {reasoning_tokens}), total: {usage.total_tokens}"
     )
 
-    if response.choices[0].finish_reason == "length":
-        print("  WARNING: response was cut off by max_completion_tokens -- consider raising it further")
+    for item in response.output:
+        if item.type == "reasoning" and item.summary:
+            for s in item.summary:
+                print(f"  Reasoning summary: {s.text}")
 
-    text = response.choices[0].message.content
+    if response.status == "incomplete":
+        reason = response.incomplete_details.reason if response.incomplete_details else "unknown"
+        print(f"  WARNING: response incomplete ({reason}) -- consider raising max_output_tokens further")
+
+    text = response.output_text
     if not text:
         print("  WARNING: empty response content -- see the known Luna-tier issue with long structured completions")
         text = ""
