@@ -20,6 +20,18 @@ HEADERS = {"Authorization": f"Bearer {BEARER_TOKEN}"}
 _READ_STATS = {"posts": 0, "users": 0, "by_account": {}}
 
 
+# username (lowercase) -> numeric user id, loaded from config.yaml's
+# `x_user_ids:` by the jobs. Ids never change, so knowing one lets us skip the
+# username lookup, which X bills at $0.01 per call. Unknown usernames still
+# work -- they just get looked up live, as before.
+_KNOWN_USER_IDS: dict[str, str] = {}
+
+
+def set_known_user_ids(mapping: dict | None) -> None:
+    for username, user_id in (mapping or {}).items():
+        _KNOWN_USER_IDS[str(username).lower()] = str(user_id)
+
+
 def get_read_stats() -> dict:
     """Returns {posts, users, by_account: {username: posts}} tallied so far."""
     return {
@@ -145,9 +157,12 @@ def fetch_x_posts(
     if phrases:
         posts = _search_recent_posts(username, lookback_days, phrases)
     else:
-        user_id = _get_user_id(username)
+        user_id = _KNOWN_USER_IDS.get(username.lower())
         if not user_id:
-            return []
+            user_id = _get_user_id(username)
+            if not user_id:
+                return []
+            print(f"  (looked up id {user_id} for @{username} -- add it to x_user_ids in config.yaml to skip this paid lookup)")
         posts = _get_user_posts(user_id, lookback_days)
 
     # every post X returned here is billed, whether or not it ends up cited

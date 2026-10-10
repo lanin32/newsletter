@@ -34,6 +34,36 @@ email:
   read_account: "theforumdevv@gmail.com"   # the account token.pickle reads from -- digest gets bcc'd here for continuity
   subject: "Crypto Weekly Digest"
 
+# Numeric X user ids, keyed by username (case doesn't matter). X bills $0.01
+# per username -> id lookup and ids never change, so fill this in once with
+# `python lookup_x_ids.py` (it prints the block to paste here, replacing the
+# `{}` line below). Usernames missing from this list still work -- they are
+# just looked up live (and paid for) on every run.
+x_user_ids:
+  "danheld": "1598709350"
+  "vitalikbuterin": "295218901"
+  "akashnet": "922670090834780162"
+  "aethircloud": "1531588175000268800"
+  "minaprotocol": "991439317053591552"
+  "starknet": "1463071986515599362"
+  "chainlink": "1530530365"
+  "octa_space": "1572155508185874432"
+  "avax": "1055894724245155841"
+  "0xpolygon": "914738730740715521"
+  "oraichain": "1300375231073120256"
+  "silencionetwork": "1584482213701238784"
+  "yom_official": "1461369439740432385"
+  "fricthefrog": "1860807053306200064"
+  "fittedcloset": "979547936655839238"
+  "the_delysium": "247180104"
+  "vaiot_ltd": "987291420729008129"
+  "hive_intel": "1727906950434684928"
+  "pinlinkai": "1628383777960656903"
+  "fluence_project": "890271827955679244"
+  "scroll_zkp": "1361909631187001350"
+  "runnitdotgg": "1889089807403626496"
+  "0xardent": "1107318128210399232"
+
 # X API pay-per-use rates in USD per resource returned, used for the cost
 # footer in the emails. X has no pricing endpoint that I could find, so update
 # these by hand if X changes its rates.

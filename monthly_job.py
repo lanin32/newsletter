@@ -12,7 +12,7 @@ import os
 import time
 import yaml
 
-from x_fetch import fetch_x_posts, get_read_stats
+from x_fetch import fetch_x_posts, get_read_stats, set_known_user_ids
 from monthly_summarize import summarize_token_digest
 from gmail_fetch import fetch_latest_email
 from gmail_send import send_email
@@ -147,6 +147,7 @@ def main():
 
     monthly_cfg = config["monthly"]
     email_cfg = config["email"]
+    set_known_user_ids(config.get("x_user_ids"))
 
     # See weekly_job.py for why this is toggleable -- same rationale, same
     # env var. Defaults on for real/scheduled use.

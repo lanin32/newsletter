@@ -11,7 +11,7 @@ import time
 import yaml
 
 from gmail_fetch import fetch_newsletter_emails, fetch_latest_email
-from x_fetch import fetch_x_posts, get_read_stats
+from x_fetch import fetch_x_posts, get_read_stats, set_known_user_ids
 from weekly_summarize import summarize_weekly_digest
 from gmail_send import send_email
 from citations import linkify_citations
@@ -157,6 +157,7 @@ def main():
         config = yaml.safe_load(f)
 
     email_cfg = config["email"]
+    set_known_user_ids(config.get("x_user_ids"))
 
     # Continuity (passing last time's digest so the model doesn't repeat old
     # news as new) is genuinely useful for real scheduled runs, a week apart --
