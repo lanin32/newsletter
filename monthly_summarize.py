@@ -6,6 +6,8 @@ dedup problem to solve (unlike the weekly digest).
 import os
 from openai import OpenAI
 
+from usage_cost import usage_record
+
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"].strip())
 
 # See weekly_summarize.py for the reasoning behind this switch. Override
@@ -94,14 +96,15 @@ def _format_posts(posts: list[dict]) -> tuple[str, dict[int, str]]:
 
 def summarize_token_digest(
     token_symbol: str, posts: list[dict], previous_digest: str | None = None
-) -> tuple[str, dict[int, str]]:
+) -> tuple[str, dict[int, str], dict | None]:
     """
-    Returns (digest_paragraph, citation_map).
+    Returns (digest_paragraph, citation_map, usage). usage is a
+    usage_cost.usage_record dict (None when there were no posts, so no call was made).
     """
     formatted, citation_map = _format_posts(posts)
 
     if not formatted.strip():
-        return "No notable activity found this month.", {}
+        return "No notable activity found this month.", {}, None
 
     user_content = f"Project: {token_symbol}\n\n{formatted}"
     if previous_digest:
@@ -139,6 +142,12 @@ def summarize_token_digest(
         else:
             raise
 
+    reasoning_used = "reasoning" in create_kwargs  # False if the fallback dropped it
+    usage_rec = usage_record(
+        response, MODEL,
+        REASONING_EFFORT if reasoning_used else None,
+        REASONING_MODE if reasoning_used else None,
+    )
     usage = response.usage
     reasoning_tokens = usage.output_tokens_details.reasoning_tokens if usage.output_tokens_details else None
     print(
@@ -161,7 +170,7 @@ def summarize_token_digest(
         print(f"  WARNING: empty response content for {token_symbol}")
         text = ""
 
-    return text.strip(), citation_map
+    return text.strip(), citation_map, usage_rec
 
 
 if __name__ == "__main__":
@@ -169,12 +178,12 @@ if __name__ == "__main__":
 
     # quick manual test -- edit these to try a specific token/account
     symbol = "AKT"
-    username = "akashnet_"
+    username = "akashnet"
 
     posts = fetch_x_posts(username, lookback_days=30)
     print(f"Found {len(posts)} posts from @{username}\n")
 
-    digest, citation_map = summarize_token_digest(symbol, posts)
+    digest, citation_map, _usage = summarize_token_digest(symbol, posts)
     print(f"=== {symbol} ===\n{digest}")
     print(f"\n=== CITATIONS ({len(citation_map)}) ===")
     for num, url in citation_map.items():

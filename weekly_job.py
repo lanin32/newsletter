@@ -11,11 +11,12 @@ import time
 import yaml
 
 from gmail_fetch import fetch_newsletter_emails, fetch_latest_email
-from x_fetch import fetch_x_posts
+from x_fetch import fetch_x_posts, get_read_stats
 from weekly_summarize import summarize_weekly_digest
 from gmail_send import send_email
 from citations import linkify_citations
-from email_render import render_cards, render_section
+from email_render import render_cards, render_section, render_cost_footer, strip_cost_footer
+from usage_cost import estimate_x_cost
 
 
 def build_sources(config: dict) -> dict:
@@ -87,7 +88,9 @@ def build_sources_footer_html(items_meta: list[dict]) -> str:
     """
 
 
-def build_email_html(digest: dict[str, str], items_meta: list[dict]) -> str:
+def build_email_html(
+    digest: dict[str, str], items_meta: list[dict], usage: dict | None = None, x_reads: dict | None = None
+) -> str:
     citation_map = {
         m["citation_num"]: m["url"] for m in items_meta if m["citation_num"] is not None
     }
@@ -95,6 +98,13 @@ def build_email_html(digest: dict[str, str], items_meta: list[dict]) -> str:
     def section(title: str, accent_color: str, text: str, bg_color: str) -> str:
         linked = linkify_citations(text, citation_map)
         return render_section(title, accent_color, render_cards(linked, bg_color))
+
+    cost_html = render_cost_footer([("Weekly digest", usage)], x_reads)
+    cost_row = (
+        f'<tr><td style="padding: 10px 8px 14px; background-color: #fafafa; '
+        f'border-top: 1px solid #eeeeee;">{cost_html}</td></tr>'
+        if cost_html else ""
+    )
 
     today_str = date.today().strftime("%B %d, %Y")
 
@@ -132,6 +142,7 @@ def build_email_html(digest: dict[str, str], items_meta: list[dict]) -> str:
                     {build_sources_footer_html(items_meta)}
                   </td>
                 </tr>
+                {cost_row}
               </table>
             </td>
           </tr>
@@ -160,7 +171,8 @@ def main():
     if continuity_enabled:
         print("Checking for last week's digest (for continuity)...")
         previous = fetch_latest_email(f'subject:"{email_cfg["subject"]}"')
-        previous_digest = previous["body"] if previous else None
+        # drop the cost footer -- it is noise for the model, not news
+        previous_digest = strip_cost_footer(previous["body"]) if previous else None
         if previous:
             print(f"  found one from {previous['date']}")
         else:
@@ -171,10 +183,11 @@ def main():
     sources = build_sources(config)
 
     print("\nSummarizing...")
-    digest, items_meta = summarize_weekly_digest(sources, previous_digest=previous_digest)
+    digest, items_meta, usage = summarize_weekly_digest(sources, previous_digest=previous_digest)
 
     print("\nBuilding email...")
-    html = build_email_html(digest, items_meta)
+    x_reads = estimate_x_cost(get_read_stats(), config.get("x_api_pricing"))
+    html = build_email_html(digest, items_meta, usage, x_reads)
 
     subject = f"{email_cfg['subject']} — {date.today().strftime('%b %d, %Y')}"
 

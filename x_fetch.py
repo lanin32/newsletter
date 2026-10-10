@@ -13,6 +13,21 @@ BASE_URL = "https://api.twitter.com/2"
 
 HEADERS = {"Authorization": f"Bearer {BEARER_TOKEN}"}
 
+# Running tally of what X returned to us during this process. X's pay-per-use
+# billing is per resource returned (posts and user objects), so counting what
+# comes back is how the digest email estimates its X API cost. One process =
+# one job run, so a module-level tally is enough.
+_READ_STATS = {"posts": 0, "users": 0, "by_account": {}}
+
+
+def get_read_stats() -> dict:
+    """Returns {posts, users, by_account: {username: posts}} tallied so far."""
+    return {
+        "posts": _READ_STATS["posts"],
+        "users": _READ_STATS["users"],
+        "by_account": dict(_READ_STATS["by_account"]),
+    }
+
 
 def _get_user_id(username: str) -> str | None:
     resp = requests.get(
@@ -22,6 +37,7 @@ def _get_user_id(username: str) -> str | None:
     if resp.status_code != 200:
         print(f"  Could not look up @{username}: {resp.status_code} {resp.text}")
         return None
+    _READ_STATS["users"] += 1  # a user object was returned (billed separately from posts)
     return resp.json()["data"]["id"]
 
 
@@ -133,6 +149,11 @@ def fetch_x_posts(
         if not user_id:
             return []
         posts = _get_user_posts(user_id, lookback_days)
+
+    # every post X returned here is billed, whether or not it ends up cited
+    _READ_STATS["posts"] += len(posts)
+    by_account = _READ_STATS["by_account"]
+    by_account[username] = by_account.get(username, 0) + len(posts)
 
     # X returns posts newest-first; reverse to oldest-first so threads read
     # in logical order and later posts can correctly reference earlier ones

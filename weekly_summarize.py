@@ -15,6 +15,8 @@ whichever section it actually belongs to -- regardless of which source it came f
 import os
 from openai import OpenAI
 
+from usage_cost import usage_record
+
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"].strip())
 
 # Switched from gpt-4.1 (30k TPM on our account tier, which this request
@@ -194,9 +196,10 @@ def _format_sources(sources: dict[str, list[dict]]) -> tuple[str, list[dict]]:
 
 def summarize_weekly_digest(
     sources: dict[str, list[dict]], previous_digest: str | None = None
-) -> tuple[dict[str, str], list[dict]]:
+) -> tuple[dict[str, str], list[dict], dict | None]:
     """
-    Returns ({"btc": "...", "eth": "...", "general": "..."}, items_meta).
+    Returns ({"btc": "...", "eth": "...", "general": "..."}, items_meta, usage).
+    usage is a usage_cost.usage_record dict for the footer (None if nothing was summarized).
     items_meta is the same structure _format_sources returns -- used to
     build the citation link map and the sources footer.
     previous_digest, if given, is last week's full digest text -- passed in
@@ -208,7 +211,7 @@ def summarize_weekly_digest(
 
     if not formatted.strip():
         empty = "No notable news found for this week."
-        return {"btc": empty, "eth": empty, "general": empty}, []
+        return {"btc": empty, "eth": empty, "general": empty}, [], None
 
     user_content = formatted
     if previous_digest:
@@ -254,6 +257,12 @@ def summarize_weekly_digest(
         else:
             raise
 
+    reasoning_used = "reasoning" in create_kwargs  # False if the fallback dropped it
+    usage_rec = usage_record(
+        response, MODEL,
+        REASONING_EFFORT if reasoning_used else None,
+        REASONING_MODE if reasoning_used else None,
+    )
     usage = response.usage
     reasoning_tokens = usage.output_tokens_details.reasoning_tokens if usage.output_tokens_details else None
     print(
@@ -289,7 +298,7 @@ def summarize_weekly_digest(
         elif current_key:
             sections[current_key] += line + "\n"
 
-    return {k: v.strip() for k, v in sections.items()}, items_meta
+    return {k: v.strip() for k, v in sections.items()}, items_meta, usage_rec
 
 
 if __name__ == "__main__":
@@ -324,7 +333,7 @@ if __name__ == "__main__":
         print(f"  found {len(posts)} posts")
 
     print("\nSummarizing...")
-    digest, items_meta = summarize_weekly_digest(sources)
+    digest, items_meta, _usage = summarize_weekly_digest(sources)
 
     for section in ["btc", "eth", "general"]:
         print(f"\n=== {section.upper()} ===")

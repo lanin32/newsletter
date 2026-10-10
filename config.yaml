@@ -34,6 +34,13 @@ email:
   read_account: "theforumdevv@gmail.com"   # the account token.pickle reads from -- digest gets bcc'd here for continuity
   subject: "Crypto Weekly Digest"
 
+# X API pay-per-use rates in USD per resource returned, used for the cost
+# footer in the emails. X has no pricing endpoint that I could find, so update
+# these by hand if X changes its rates.
+x_api_pricing:
+  post_read: 0.005   # per post returned
+  user_read: 0.010   # per user object returned (the username -> id lookup)
+
 monthly:
   subject: "Crypto Monthly Digest — Small/Mid Caps"
   tokens:
